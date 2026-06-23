@@ -148,9 +148,10 @@ page.goto("https://example.com")
 
 ---
 
-## Latest: v0.4.2 — CloakBrowser Pro (Chromium 148.0.7778.215.2)
+## Latest: v0.4.3 — CloakBrowser Pro + .NET 8 client (Chromium 148.0.7778.215.2)
 
-- **CloakBrowser Pro** — the latest binary (Chromium 148.0.7778.215.2, 59 source-level patches) is now available to Pro subscribers; v146 stays free forever. Set a `license_key` (`licenseKey` in JS) or the `CLOAKBROWSER_LICENSE_KEY` env var and the wrapper fetches the latest build automatically. See [CloakBrowser Pro](#cloakbrowser-pro)
+- **CloakBrowser Pro** — the latest binary (Chromium 148.0.7778.215.2, 59 source-level patches) is available to Pro subscribers, now on **all platforms including macOS** (Apple Silicon + Intel); v146 stays free forever. Set a `license_key` (`licenseKey` in JS) or the `CLOAKBROWSER_LICENSE_KEY` env var and the wrapper fetches the latest build automatically. See [CloakBrowser Pro](#cloakbrowser-pro)
+- **.NET 8 / C# client** — CloakBrowser now ships as a NuGet package (`CloakBrowser`), mirroring the Python and JS wrappers.
 - **58 fingerprint patches** — rendering consistency improvements across Linux and Windows, corrected GPU/display/graphics parameters to match stock Chrome 146 profiles
 - **Windows native GPU passthrough** — real hardware values pass through directly instead of being spoofed, matching real browser behavior
 - **HTTP proxy inline credentials** — new network-layer support for proxies with inline authentication
@@ -832,13 +833,13 @@ browser = await launch_async(args=["--remote-debugging-port=9242"])
 
 ## Platforms
 
-| Platform | Chromium | Patches | Status |
+| Platform | Free | Pro | Status |
 |---|---|---|---|
-| Linux x86_64 | 146 | 58 | ✅ Latest |
-| Linux arm64 (RPi, Graviton) | 146 | 58 | ✅ |
-| macOS arm64 (Apple Silicon) | 145 | 26 | ✅ |
-| macOS x86_64 (Intel) | 145 | 26 | ✅ |
-| Windows x86_64 | 146 | 58 | ✅ Latest |
+| Linux x86_64 | Chromium 146 (58 patches) | Chromium 148 (59 patches) | ✅ |
+| Linux arm64 (RPi, Graviton) | Chromium 146 (58 patches) | Chromium 148 (59 patches) | ✅ |
+| macOS arm64 (Apple Silicon) | Chromium 145 (26 patches) | Chromium 148 (59 patches) | ✅ |
+| macOS x86_64 (Intel) | Chromium 145 (26 patches) | Chromium 148 (59 patches) | ✅ |
+| Windows x86_64 | Chromium 146 (58 patches) | Chromium 148 (59 patches) | ✅ |
 
 The wrapper auto-downloads the correct binary for your platform.
 
@@ -1244,12 +1245,6 @@ playwright install-deps chromium
 
 ---
 
-### macOS: Blocked on some sites that pass on Linux
-
-The macOS fingerprint profile has known inconsistencies that aggressive bot detection catches. If a site blocks you on macOS but works on Linux, switch to a Windows fingerprint profile by passing `stealth_args=False` and manually setting `--fingerprint-platform=windows` with matching GPU flags (see [Fingerprint Management](#fingerprint-management) for the full flag list).
-
----
-
 ### Site detects incognito / private browsing mode
 
 By default, `launch()` opens an incognito context. Some sites penalize this. Use `launch_persistent_context()` to get a real profile with cookie persistence:
@@ -1322,17 +1317,6 @@ A: Possibly. Bot detection is an arms race. Source-level patches are harder to d
 
 **Q: Can I use my own proxy?**
 A: Yes. Pass `proxy="http://user:pass@host:port"` or `proxy="socks5://user:pass@host:port"` to `launch()`. Both HTTP and SOCKS5 proxies are supported natively.
-
-## Roadmap
-
-| Feature | Status |
-|---------|--------|
-| Linux x64 — Chromium 146 (58 patches) | ✅ Released |
-| macOS arm64/x64 — Chromium 145 (26 patches) | ✅ Released |
-| Windows x64 — Chromium 146 (58 patches) | ✅ Released |
-| JavaScript/Puppeteer + Playwright support | ✅ Released |
-| Fingerprint rotation per session | ✅ Released |
-| Built-in proxy rotation | 📋 Planned |
 
 ## Links
 

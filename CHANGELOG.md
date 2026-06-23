@@ -6,6 +6,12 @@ Changes are tagged: **[wrapper]** for Python/JS wrapper, **[binary]** for Chromi
 
 ---
 
+## [0.4.3] — 2026-06-24
+
+- **[wrapper]** **.NET 8 / C# client** — CloakBrowser now ships as a NuGet package (`CloakBrowser`), mirroring the Python and JS wrappers. Contributed by [@evelaa123](https://github.com/evelaa123) in PR #385.
+- **[wrapper]** **macOS Pro is now available** — the latest binary (Chromium 148.0.7778.215.2) downloads on macOS (Apple Silicon + Intel) with a Pro license, the same as Linux and Windows. v146 stays free.
+- **[wrapper]** A valid Pro license now hard-fails on a Pro download error on *every* platform instead of silently downgrading to the free binary. The temporary macOS-only free fallback added in 0.4.2 is removed now that the macOS Pro build ships. Python, JS, and .NET.
+
 ## [0.4.2] — 2026-06-23
 
 - **[wrapper]** macOS Pro licenses now fall back to the free binary (macOS Pro build coming) instead of failing to launch. Transient and signature-verification failures still hard-fail. Python and JS.

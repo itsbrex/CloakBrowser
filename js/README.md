@@ -243,7 +243,7 @@ The wrapper (Python + JS) is MIT, free forever. The binary uses a delayed
 free-release model:
 
 - **Free (v146)** — free forever on [GitHub Releases](https://github.com/CloakHQ/cloakbrowser/releases). Unlimited sessions. Works today, goes stale as detection evolves.
-- **Pro (latest, v148)** — the newest patches and Chromium upgrades first, so the [test results](#test-results) stay green as anti-bot systems change. Linux + Windows (macOS coming).
+- **Pro (latest, v148)** — the newest patches and Chromium upgrades first, so the [test results](#test-results) stay green as anti-bot systems change. Linux, Windows, and macOS (Apple Silicon + Intel).
 
 Anti-bot detection updates constantly — an older binary degrades within weeks.
 Pro keeps you on the build that's actively maintained against it.
