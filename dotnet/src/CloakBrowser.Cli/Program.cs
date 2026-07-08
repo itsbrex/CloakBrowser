@@ -101,6 +101,20 @@ static void PrintDiagnostics(Dictionary<string, object?> diag)
     {
         if ((string)binary["tier"]! == "override")
             Console.WriteLine("Version:   set via CLOAKBROWSER_BINARY_PATH (see Launch line)");
+        else if (binary.TryGetValue("latest_version", out var lv) && lv is string latest && !string.IsNullOrEmpty(latest))
+        {
+            // Pro: show what launches now AND the server's latest, so the two can't diverge.
+            Console.WriteLine($"Version:   {binary["version"]} ({binary["tier"]}) — will launch");
+            if (latest == binary["version"] as string)
+                Console.WriteLine($"Latest:    {latest} (up to date)");
+            else if (binary.TryGetValue("pinned", out var p) && p is true)
+                Console.WriteLine($"Latest:    {latest} (available — pinned; unset CLOAKBROWSER_VERSION to upgrade)");
+            else
+                Console.WriteLine($"Latest:    {latest} (available — next launch upgrades)");
+        }
+        else if (binary["version"] is null)
+            // Pro with no cached build and no server answer (e.g. offline).
+            Console.WriteLine($"Version:   not downloaded yet ({binary["tier"]}) — next launch downloads the latest");
         else
             Console.WriteLine($"Version:   {binary["version"]} ({binary["tier"]})");
         Console.WriteLine($"Binary:    {binary["path"]}");
@@ -184,9 +198,32 @@ static void PrintDiagnostics(Dictionary<string, object?> diag)
 static async Task CmdUpdate()
 {
     CloakLog.Info("Checking for updates...");
-    string? newVersion = await Download.CheckForUpdateAsync().ConfigureAwait(false);
+
+    // A valid Pro license updates the Pro binary; everyone else updates free.
+    // Mirrors Diagnostics.ResolveLicense: a custom download URL disables Pro routing.
+    string? key = License.ResolveLicenseKey();
+    if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CLOAKBROWSER_DOWNLOAD_URL"))) key = null;
+    bool entitledPro = false;
+    if (!string.IsNullOrEmpty(key))
+    {
+        try { entitledPro = License.ValidateLicense(key!)?.Valid == true; }
+        catch { entitledPro = false; }
+    }
+
+    string? newVersion;
+    string label;
+    if (entitledPro)
+    {
+        newVersion = await Download.CheckForProUpdateAsync(key!).ConfigureAwait(false);
+        label = "Pro Chromium";
+    }
+    else
+    {
+        newVersion = await Download.CheckForUpdateAsync().ConfigureAwait(false);
+        label = "Chromium";
+    }
     Console.WriteLine(newVersion != null
-        ? $"Updated to Chromium {newVersion}"
+        ? $"Updated to {label} {newVersion}"
         : "Already up to date.");
 }
 

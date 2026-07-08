@@ -30,7 +30,7 @@ internal static class Diagnostics
         catch (Exception ex) { env["platform_tag"] = $"unavailable ({ex.Message})"; }
 
         Dictionary<string, object?> binary;
-        try { binary = EffectiveBinary(entitledPro); }
+        try { binary = EffectiveBinary(entitledPro, quick); }
         catch (Exception ex) { binary = new Dictionary<string, object?> { ["error"] = ex.Message }; }
         diag["binary"] = binary;
 
@@ -125,7 +125,7 @@ internal static class Diagnostics
     // Describe the binary EnsureBinary would actually launch (no download).
     // Unlike Download.BinaryInfo(), a Pro binary on disk is only reported when
     // the license entitles Pro — so a keyless run shows the free binary.
-    private static Dictionary<string, object?> EffectiveBinary(bool entitledPro)
+    private static Dictionary<string, object?> EffectiveBinary(bool entitledPro, bool quick = false)
     {
         string? over = Config.GetLocalBinaryOverride();
         if (!string.IsNullOrEmpty(over))
@@ -133,6 +133,8 @@ internal static class Diagnostics
             return new Dictionary<string, object?>
             {
                 ["version"] = null,
+                ["latest_version"] = null,
+                ["pinned"] = false,
                 ["tier"] = "override",
                 ["bundled_version"] = Config.ChromiumVersion,
                 ["path"] = over,
@@ -142,25 +144,34 @@ internal static class Diagnostics
             };
         }
         string? requested = Config.NormalizeRequestedVersion();
-        string version;
+
+        // For a Pro license, surface the server's latest separately from the version
+        // that will actually launch, so `info` can never silently diverge from launch
+        // (the divergence a customer hit: info showed latest, launch ran a stale cache).
+        // --quick keeps `info` fully network-free (skip the server latest lookup).
+        string? latestVersion = (entitledPro && !quick) ? License.GetProLatestVersion() : null;
+
+        string? version;
         if (!string.IsNullOrEmpty(requested))
             version = requested!;
         else if (entitledPro)
-            // Mirror EnsureBinary: a Pro launch resolves the latest Pro version over
-            // the network. Without this a fresh Pro user (no cached marker) would see
-            // the free base version paired with the -pro path, which never ships.
-            version = License.GetProLatestVersion() ?? Config.GetEffectiveVersion(true);
+            // "Will launch now" is the cached Pro build; if none is cached, the next
+            // launch downloads latestVersion. GetEffectiveVersion(true) returns null
+            // (never the free base) when nothing is cached.
+            version = Config.GetEffectiveVersion(true) ?? latestVersion;
         else
             version = Config.GetEffectiveVersion(false);
-        string path = Config.GetBinaryPath(version, entitledPro);
+        string? path = version != null ? Config.GetBinaryPath(version, entitledPro) : null;
         return new Dictionary<string, object?>
         {
             ["version"] = version,
+            ["latest_version"] = latestVersion,
+            ["pinned"] = !string.IsNullOrEmpty(requested),
             ["tier"] = entitledPro ? "pro" : "free",
             ["bundled_version"] = Config.ChromiumVersion,
             ["path"] = path,
-            ["installed"] = File.Exists(path),
-            ["cache_dir"] = Config.GetBinaryDir(version, entitledPro),
+            ["installed"] = path != null && File.Exists(path),
+            ["cache_dir"] = version != null ? Config.GetBinaryDir(version, entitledPro) : null,
             ["override"] = null,
         };
     }

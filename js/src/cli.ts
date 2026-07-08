@@ -10,7 +10,7 @@
  *   npx cloakbrowser clear-cache  # Remove cached binaries
  */
 
-import { ensureBinary, checkForUpdate, clearCache } from "./download.js";
+import { ensureBinary, checkForUpdate, checkForProUpdate, clearCache } from "./download.js";
 import {
   getLocalBinaryOverride,
   getCacheDir,
@@ -114,11 +114,16 @@ async function resolveLicense(): Promise<{ license: Record<string, unknown>; ent
 }
 
 /** Describe the binary ensureBinary would actually launch (no download). */
-async function effectiveBinary(entitledPro: boolean): Promise<Record<string, unknown>> {
+async function effectiveBinary(
+  entitledPro: boolean,
+  quick = false
+): Promise<Record<string, unknown>> {
   const override = getLocalBinaryOverride();
   if (override) {
     return {
       version: null,
+      latest_version: null,
+      pinned: false,
       tier: "override",
       bundled_version: CHROMIUM_VERSION,
       path: override,
@@ -128,25 +133,36 @@ async function effectiveBinary(entitledPro: boolean): Promise<Record<string, unk
     };
   }
   const requested = normalizeRequestedVersion();
-  let version: string;
+
+  // For a Pro license, surface the server's latest separately from the version
+  // that will actually launch, so `info` can never silently diverge from launch
+  // (the divergence a customer hit: info showed latest, launch ran a stale cache).
+  // --quick keeps `info` fully network-free (skip the server latest lookup).
+  let latestVersion: string | null = null;
+  if (entitledPro && !quick) {
+    latestVersion = await getProLatestVersion();
+  }
+
+  let version: string | null;
   if (requested) {
     version = requested;
   } else if (entitledPro) {
-    // Mirror ensureBinary: a Pro launch resolves the latest Pro version over the
-    // network. Without this a fresh Pro user (no cached marker) would see the free
-    // base version paired with the -pro path, which never ships.
-    version = (await getProLatestVersion()) || getEffectiveVersion(true);
+    // "Will launch now" is the cached Pro build; if none is cached, the next launch
+    // downloads latestVersion. getEffectiveVersion(true) returns null (never free).
+    version = getEffectiveVersion(true) ?? latestVersion;
   } else {
     version = getEffectiveVersion(false);
   }
-  const binPath = getBinaryPath(version, entitledPro);
+  const binPath = version ? getBinaryPath(version, entitledPro) : null;
   return {
     version,
+    latest_version: latestVersion,
+    pinned: Boolean(requested),
     tier: entitledPro ? "pro" : "free",
     bundled_version: CHROMIUM_VERSION,
     path: binPath,
-    installed: fs.existsSync(binPath),
-    cache_dir: getBinaryDir(version, entitledPro),
+    installed: binPath ? fs.existsSync(binPath) : false,
+    cache_dir: version ? getBinaryDir(version, entitledPro) : null,
     override: null,
   };
 }
@@ -171,7 +187,7 @@ export async function collectDiagnostics(quick: boolean): Promise<Record<string,
   }
 
   try {
-    diag.binary = await effectiveBinary(entitledPro);
+    diag.binary = await effectiveBinary(entitledPro, quick);
   } catch (err) {
     diag.binary = { error: (err as Error).message };
   }
@@ -231,6 +247,23 @@ function printDiagnostics(diag: Record<string, any>): void {
   } else {
     if (binary.tier === "override") {
       console.log("Version:   set via CLOAKBROWSER_BINARY_PATH (see Launch line)");
+    } else if (binary.latest_version) {
+      // Pro: show what launches now AND the server's latest, so the two can't diverge.
+      console.log(`Version:   ${binary.version} (${binary.tier}) — will launch`);
+      if (binary.latest_version === binary.version) {
+        console.log(`Latest:    ${binary.latest_version} (up to date)`);
+      } else if (binary.pinned) {
+        console.log(
+          `Latest:    ${binary.latest_version} (available — pinned; unset CLOAKBROWSER_VERSION to upgrade)`
+        );
+      } else {
+        console.log(`Latest:    ${binary.latest_version} (available — next launch upgrades)`);
+      }
+    } else if (binary.version === null) {
+      // Pro with no cached build and no server answer (e.g. offline).
+      console.log(
+        `Version:   not downloaded yet (${binary.tier}) — next launch downloads the latest`
+      );
     } else {
       console.log(`Version:   ${binary.version} (${binary.tier})`);
     }
@@ -310,9 +343,19 @@ async function cmdInfo(args: string[]): Promise<void> {
 
 async function cmdUpdate(): Promise<void> {
   console.error("Checking for updates...");
-  const newVersion = await checkForUpdate();
+  // A valid Pro license updates the Pro binary; everyone else updates free.
+  const { entitledPro } = await resolveLicense();
+  let newVersion: string | null;
+  let label: string;
+  if (entitledPro) {
+    newVersion = await checkForProUpdate(resolveLicenseKey()!);
+    label = "Pro Chromium";
+  } else {
+    newVersion = await checkForUpdate();
+    label = "Chromium";
+  }
   if (newVersion) {
-    console.log(`Updated to Chromium ${newVersion}`);
+    console.log(`Updated to ${label} ${newVersion}`);
   } else {
     console.log("Already up to date.");
   }
